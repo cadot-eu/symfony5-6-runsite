@@ -48,6 +48,8 @@ RUN set -xe \
   libonig-dev \
   libmagickwand-dev \
   libpq-dev \
+  chromium \
+  firefox-esr \
   " \
   && apt-get update -q -y && apt-get install -q -y --no-install-recommends $buildDeps && rm -rf /var/lib/apt/lists/* \
   # Extract php source and install missing extensions
@@ -62,6 +64,11 @@ RUN set -xe \
 
 # Install imagemagick
 RUN pecl install -o imagick && docker-php-ext-enable imagick 
+
+#cronbundle
+RUN docker-php-ext-configure pcntl --enable-pcntl \
+  && docker-php-ext-install \
+    pcntl
 
 # Install xdebug but not active TODO:àfinir
 #RUN pecl install -o "xdebug" 
