@@ -124,7 +124,7 @@ RUN mv phpunit.phar /usr/local/bin/phpunit
 RUN command -v phpunit
 RUN wget https://github.com/dantleech/fink/releases/download/0.10.3/fink.phar
 RUN chmod +x fink.phar
-RUN mv fink.phar /usr/local/bin/fink.phar
+RUN mv fink.phar /usr/bin/fink.phar
 
 WORKDIR /app
 RUN echo 'alias sc="php /app/bin/console"' >> ~/.bashrc
