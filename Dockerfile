@@ -1,4 +1,4 @@
-FROM php:8.1.3-apache
+FROM php:8.1.12-apache
 
 RUN a2enmod rewrite
 
@@ -91,7 +91,7 @@ RUN cat /php.ini>>${PHP_INI_DIR}/php.ini
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-RUN curl -fsSL https://deb.nodesource.com/setup_17.x | bash -
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
 RUN apt-get install -y nodejs nano pandoc gcc g++ cmake libpng-dev libfreetype-dev libfontconfig1-dev
 RUN npm install -g yarn
 
