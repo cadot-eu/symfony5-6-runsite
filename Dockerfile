@@ -2,111 +2,60 @@ FROM php:8.1.12-apache
 
 RUN a2enmod rewrite
 
-# Get packages that we need in container
-RUN apt-get update -q -y \
-  && apt-get install -q -y --no-install-recommends \
-  ca-certificates \
-  curl \
-  acl \
-  sudo \
-  ghostscript \
-  # Needed for the php extensions we enable below
-  libfreetype6 \
-  libjpeg62-turbo \
-  libxpm4 \
-  libpng16-16 \
-  libicu67 \
-  libxslt1.1 \
-  libmemcachedutil2 \
-  libzip-dev \
-  imagemagick \
-  libonig5 \
-  libpq5 \ 
-  unzip \
-  git \
-  less \
-  mariadb-client \
-  vim \
-  wget \
-  tree \
-  gdb-minimal \
-  && rm -rf /var/lib/apt/lists/*
+# Set environment variables
+ENV SYMFONY_VERSION=6 \
+    COMPOSER_ALLOW_SUPERUSER=1 \
+    PATH=/var/www/html/vendor/bin:$PATH
 
-# Install and configure php plugins
-RUN set -xe \
-  && buildDeps=" \
-  $PHP_EXTRA_BUILD_DEPS \
-  libfreetype6-dev \
-  libjpeg62-turbo-dev \
-  libxpm-dev \
-  libpng-dev \
-  libicu-dev \
-  libxslt1-dev \
-  libmemcached-dev \
-  libzip-dev \
-  libxml2-dev \
-  libonig-dev \
-  libmagickwand-dev \
-  libpq-dev \
-  chromium \
-  firefox-esr \
-  " \
-  && apt-get update -q -y && apt-get install -q -y --no-install-recommends $buildDeps && rm -rf /var/lib/apt/lists/* \
-  # Extract php source and install missing extensions
-  && docker-php-source extract \
-  && docker-php-ext-configure mysqli --with-mysqli=mysqlnd \
-  && docker-php-ext-configure pdo_mysql --with-pdo-mysql=mysqlnd \
-  && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-  && docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ --with-xpm=/usr/include/ --enable-gd-jis-conv \
-  && docker-php-ext-install exif gd mbstring intl xsl zip mysqli pdo_mysql pdo_pgsql pgsql soap bcmath \
-  && docker-php-ext-enable opcache \
-  && cp /usr/src/php/php.ini-production ${PHP_INI_DIR}/php.ini 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    libicu-dev \
+    libpng-dev \
+    libzip-dev \
+    nano \
+    unzip \
+    zip
 
-# Install imagemagick
-RUN pecl install -o imagick && docker-php-ext-enable imagick 
+# Install PHP extensions
+RUN docker-php-ext-install \
+    bcmath \
+    intl \
+    opcache \
+    zip \
+    exif
 
-#cronbundle
-RUN docker-php-ext-configure pcntl --enable-pcntl \
-  && docker-php-ext-install \
-    pcntl
+RUN apt-get install -y ca-certificates curl gnupg; \
+    mkdir -p /etc/apt/keyrings; \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+     | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
+    NODE_MAJOR=18; \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" \
+     > /etc/apt/sources.list.d/nodesource.list; \
+    apt-get update; \
+    apt-get install nodejs -y;
 
-# Install xdebug but not active TODO:àfinir
-#RUN pecl install -o "xdebug" 
-#COPY xdebug.ini ${PHP_INI_DIR}/conf.d/xdebug.ini.disabled
-#COPY xdebug.sh /scripts/xdebug.sh
-#RUN chmod +x /scripts/xdebug.sh
-#RUN /scripts/xdebug.sh
-
-# Delete source & builds deps so it does not hang around in layers taking up space
-RUN pecl clear-cache \
-  && rm -Rf "$(pecl config-get temp_dir)/*" \
-  && docker-php-source delete \
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $buildDeps
-
-COPY php.ini /php.ini
-RUN cat /php.ini>>${PHP_INI_DIR}/php.ini
-
-# RUN wget https://getcomposer.org/download/2.0.9/composer.phar \
-#   && mv composer.phar /usr/bin/composer && chmod +x /usr/bin/composer
-
-COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
-
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-RUN apt-get install -y nodejs nano pandoc gcc g++ cmake libpng-dev libfreetype-dev libfontconfig1-dev
-RUN npm install -g yarn
-
-COPY apache.conf /etc/apache2/sites-enabled/000-default.conf
-COPY . /app
+# Install Yarn
+RUN    npm install -g yarn
 
 
-RUN apt install memcached libmemcached-tools libnss3 -y # chromium-driver
-RUN set -ex \
-    && rm -rf /var/lib/apt/lists/* \
-    && MEMCACHED="`mktemp -d`" \
-    && curl -skL https://github.com/php-memcached-dev/php-memcached/archive/master.tar.gz | tar zxf - --strip-components 1 -C $MEMCACHED \
-    && docker-php-ext-configure $MEMCACHED \
-    && docker-php-ext-install $MEMCACHED \
-    && rm -rf $MEMCACHED
+RUN apt-get update && apt-get install -y \
+    libmagickwand-dev --no-install-recommends \
+    && pecl install imagick \
+	&& docker-php-ext-enable imagick
+
+
+
+# Install AMQP extension
+RUN apt-get install -y librabbitmq-dev && \
+    pecl install amqp && \
+    docker-php-ext-enable amqp
+
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 
 ENV SYMFONY_DEPRECATIONS_HELPER=weak 
 
@@ -118,13 +67,49 @@ ENV PANTHER_CHROME_ARGUMENTS='--disable-dev-shm-usage'
 
 RUN LC_ALL=fr_FR.UTF-8
 
-RUN wget https://phar.phpunit.de/phpunit.phar
-RUN chmod +x phpunit.phar
-RUN mv phpunit.phar /usr/local/bin/phpunit
-RUN command -v phpunit
+COPY php.ini /php.ini
+RUN cat /php.ini>>${PHP_INI_DIR}/php.ini
+
+# Install Xdebug
+# RUN pecl install xdebug && \
+#    docker-php-ext-enable xdebug
+
+#MYSQL
+RUN docker-php-ext-configure mysqli --with-mysqli=mysqlnd \
+&& docker-php-ext-install pdo pdo_mysql
+
+#APCU
+ENV EXT_APCU_VERSION=5.1.22
+
+RUN docker-php-source extract \
+&& mkdir -p /usr/src/php/ext/apcu \
+&& curl -fsSL https://github.com/krakjoe/apcu/archive/v$EXT_APCU_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/apcu --strip 1 \
+&& docker-php-ext-install apcu \
+&& docker-php-source delete
+
+    
 RUN wget https://github.com/dantleech/fink/releases/download/0.10.3/fink.phar
 RUN chmod +x fink.phar
 RUN mv fink.phar /usr/bin/fink.phar
+
+# chromium-driver
+RUN apt install memcached libmemcached-tools libnss3 chromium -y 
+
+#GD
+RUN apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev
+RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ 
+RUN docker-php-ext-install gd
+
+#webp
+RUN apt-get install -y webp
+
+#cache pour apache
+RUN a2enmod cache
+RUN a2enmod cache_disk
+RUN a2enmod headers
+
+COPY apache.conf /etc/apache2/sites-enabled/000-default.conf
+COPY . /app
 
 WORKDIR /app
 RUN echo 'alias sc="php /app/bin/console"' >> ~/.bashrc
