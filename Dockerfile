@@ -1,4 +1,4 @@
-FROM php:8.1.33-apache
+FROM php:8.2.29-apache
 
 RUN a2enmod rewrite
 
