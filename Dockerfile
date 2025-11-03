@@ -1,4 +1,4 @@
-FROM php:8.1.12-apache
+FROM php:8.1.33-apache
 
 RUN a2enmod rewrite
 
@@ -37,9 +37,8 @@ RUN apt-get install -y ca-certificates curl gnupg; \
     apt-get update; \
     apt-get install nodejs -y;
 
-# Install Yarn
-RUN    npm install -g yarn
-
+# Install Yarn (via Corepack to avoid npm dependency)
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
 
 RUN apt-get update && apt-get install -y \
     libmagickwand-dev --no-install-recommends \
